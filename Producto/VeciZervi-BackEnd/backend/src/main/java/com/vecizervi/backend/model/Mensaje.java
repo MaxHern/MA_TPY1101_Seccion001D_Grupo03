@@ -1,5 +1,6 @@
 package com.vecizervi.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
@@ -15,14 +16,19 @@ public class Mensaje {
 
     @ManyToOne
     @JoinColumn(name = "id_trabajo", nullable = false)
+    // Solo devuelve el id del trabajo, evita ciclo infinito
+    @JsonIgnoreProperties({"cliente","categoria","descripcion","postulaciones","mensajes"})
     private Trabajo trabajo;
 
     @ManyToOne
     @JoinColumn(name = "id_emisor", nullable = false)
+    // Solo devuelve datos bÃ¡sicos del emisor
+    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
     private Usuario emisor;
 
     @ManyToOne
     @JoinColumn(name = "id_receptor")
+    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
     private Usuario receptor;
 
     @Column(nullable = false, columnDefinition = "TEXT")
