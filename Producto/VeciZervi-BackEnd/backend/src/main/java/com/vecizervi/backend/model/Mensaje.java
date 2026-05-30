@@ -16,19 +16,29 @@ public class Mensaje {
 
     @ManyToOne
     @JoinColumn(name = "id_trabajo", nullable = false)
-    // Solo devuelve el id del trabajo, evita ciclo infinito
-    @JsonIgnoreProperties({"cliente","categoria","descripcion","postulaciones","mensajes"})
+    @JsonIgnoreProperties({
+        "cliente","categoria","descripcion","postulaciones",
+        "mensajes","estado","precio","comuna","fechaPublicacion",
+        "fechaFinalizacion","latitud","longitud","titulo"
+    })
     private Trabajo trabajo;
 
     @ManyToOne
     @JoinColumn(name = "id_emisor", nullable = false)
-    // Solo devuelve datos bÃ¡sicos del emisor
-    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
+    @JsonIgnoreProperties({
+        "password","tokenRecuperacion","cuentaBloqueadaHasta",
+        "intentosFallidos","herramientasPropias","rut",
+        "fechaNacimiento","correo","rol","calificacionPromedio"
+    })
     private Usuario emisor;
 
     @ManyToOne
     @JoinColumn(name = "id_receptor")
-    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
+    @JsonIgnoreProperties({
+        "password","tokenRecuperacion","cuentaBloqueadaHasta",
+        "intentosFallidos","herramientasPropias","rut",
+        "fechaNacimiento","correo","rol","calificacionPromedio"
+    })
     private Usuario receptor;
 
     @Column(nullable = false, columnDefinition = "TEXT")
@@ -51,4 +61,5 @@ public class Mensaje {
     public String getContenido() { return contenido; }
     public void setContenido(String contenido) { this.contenido = contenido; }
     public LocalDateTime getFechaEnvio() { return fechaEnvio; }
+    public void setFechaEnvio(LocalDateTime f) { this.fechaEnvio = f; }
 }

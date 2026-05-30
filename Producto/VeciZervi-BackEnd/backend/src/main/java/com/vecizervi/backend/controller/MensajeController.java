@@ -33,37 +33,43 @@ public class MensajeController {
     // POST enviar mensaje
     @PostMapping
     public ResponseEntity<?> postMensaje(@RequestBody Map<String, Object> body) {
-        if (!body.containsKey("id_trabajo") || !body.containsKey("id_emisor") || !body.containsKey("contenido"))
-            return ResponseEntity.badRequest().body("Faltan campos: id_trabajo, id_emisor, contenido.");
+        try {
+            if (!body.containsKey("id_trabajo") || !body.containsKey("id_emisor") || !body.containsKey("contenido"))
+                return ResponseEntity.badRequest().body("Faltan campos: id_trabajo, id_emisor, contenido.");
 
-        Long idTrabajo   = Long.valueOf(body.get("id_trabajo").toString());
-        Long idEmisor    = Long.valueOf(body.get("id_emisor").toString());
-        String contenido = body.get("contenido").toString().trim();
+            Long idTrabajo   = Long.valueOf(body.get("id_trabajo").toString());
+            Long idEmisor    = Long.valueOf(body.get("id_emisor").toString());
+            String contenido = body.get("contenido").toString().trim();
 
-        if (contenido.isEmpty())
-            return ResponseEntity.badRequest().body("El contenido no puede estar vacÃ­o.");
+            if (contenido.isEmpty())
+                return ResponseEntity.badRequest().body("El contenido no puede estar vacÃ­o.");
 
-        Trabajo trabajo = trabajoRepository.findById(idTrabajo).orElse(null);
-        Usuario emisor  = usuarioRepository.findById(idEmisor).orElse(null);
+            Trabajo trabajo = trabajoRepository.findById(idTrabajo).orElse(null);
+            Usuario emisor  = usuarioRepository.findById(idEmisor).orElse(null);
 
-        if (trabajo == null) return ResponseEntity.badRequest().body("Trabajo no encontrado.");
-        if (emisor  == null) return ResponseEntity.badRequest().body("Emisor no encontrado.");
+            if (trabajo == null) return ResponseEntity.badRequest().body("Trabajo no encontrado: " + idTrabajo);
+            if (emisor  == null) return ResponseEntity.badRequest().body("Emisor no encontrado: " + idEmisor);
 
-        Usuario receptor = null;
-        if (body.containsKey("id_receptor")) {
-            try {
-                Long idReceptor = Long.valueOf(body.get("id_receptor").toString());
-                if (idReceptor > 0) receptor = usuarioRepository.findById(idReceptor).orElse(null);
-            } catch (Exception ignored) {}
+            Usuario receptor = null;
+            if (body.containsKey("id_receptor")) {
+                try {
+                    Long idReceptor = Long.valueOf(body.get("id_receptor").toString());
+                    if (idReceptor > 0) receptor = usuarioRepository.findById(idReceptor).orElse(null);
+                } catch (Exception ignored) {}
+            }
+
+            Mensaje m = new Mensaje();
+            m.setTrabajo(trabajo);
+            m.setEmisor(emisor);
+            m.setReceptor(receptor);
+            m.setContenido(contenido);
+
+            Mensaje guardado = mensajeRepository.save(m);
+            return ResponseEntity.ok(guardado);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
-
-        Mensaje m = new Mensaje();
-        m.setTrabajo(trabajo);
-        m.setEmisor(emisor);
-        m.setReceptor(receptor);
-        m.setContenido(contenido);
-
-        Mensaje guardado = mensajeRepository.save(m);
-        return ResponseEntity.ok(guardado);
     }
 }
