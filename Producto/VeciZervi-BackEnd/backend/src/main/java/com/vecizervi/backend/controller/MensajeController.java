@@ -26,50 +26,64 @@ public class MensajeController {
     public ResponseEntity<?> getMensajes(@PathVariable Long idTrabajo) {
         Trabajo trabajo = trabajoRepository.findById(idTrabajo).orElse(null);
         if (trabajo == null) return ResponseEntity.notFound().build();
-        List<Mensaje> mensajes = mensajeRepository.findByTrabajoOrderByFechaEnvioAsc(trabajo);
-        return ResponseEntity.ok(mensajes);
+        return ResponseEntity.ok(mensajeRepository.findByTrabajoOrderByFechaEnvioAsc(trabajo));
+    }
+
+    // GET todos los trabajos donde el usuario participó en el chat (para el inbox)
+    @GetMapping("/inbox/{idUsuario}")
+    public ResponseEntity<?> getInbox(@PathVariable Long idUsuario) {
+        Usuario usuario = usuarioRepository.findById(idUsuario).orElse(null);
+        if (usuario == null) return ResponseEntity.notFound().build();
+
+        // Trabajos donde el usuario envió o recibió mensajes
+        List<Trabajo> trabajosConMensajes = mensajeRepository.findTrabajosConMensajesByUsuario(usuario);
+
+        // También incluir trabajos donde es el cliente (aunque no haya escrito aún)
+        List<Trabajo> trabajosComoCliente = trabajoRepository.findByCliente(usuario);
+
+        // Unir ambas listas sin duplicados
+        for (Trabajo t : trabajosComoCliente) {
+            if (trabajosConMensajes.stream().noneMatch(tm -> tm.getId().equals(t.getId()))) {
+                trabajosConMensajes.add(t);
+            }
+        }
+
+        return ResponseEntity.ok(trabajosConMensajes);
     }
 
     // POST enviar mensaje
     @PostMapping
     public ResponseEntity<?> postMensaje(@RequestBody Map<String, Object> body) {
-        try {
-            if (!body.containsKey("id_trabajo") || !body.containsKey("id_emisor") || !body.containsKey("contenido"))
-                return ResponseEntity.badRequest().body("Faltan campos: id_trabajo, id_emisor, contenido.");
+        if (!body.containsKey("id_trabajo") || !body.containsKey("id_emisor") || !body.containsKey("contenido"))
+            return ResponseEntity.badRequest().body("Faltan campos: id_trabajo, id_emisor, contenido.");
 
-            Long idTrabajo   = Long.valueOf(body.get("id_trabajo").toString());
-            Long idEmisor    = Long.valueOf(body.get("id_emisor").toString());
-            String contenido = body.get("contenido").toString().trim();
+        Long idTrabajo   = Long.valueOf(body.get("id_trabajo").toString());
+        Long idEmisor    = Long.valueOf(body.get("id_emisor").toString());
+        String contenido = body.get("contenido").toString().trim();
 
-            if (contenido.isEmpty())
-                return ResponseEntity.badRequest().body("El contenido no puede estar vacÃ­o.");
+        if (contenido.isEmpty())
+            return ResponseEntity.badRequest().body("El contenido no puede estar vacío.");
 
-            Trabajo trabajo = trabajoRepository.findById(idTrabajo).orElse(null);
-            Usuario emisor  = usuarioRepository.findById(idEmisor).orElse(null);
+        Trabajo trabajo = trabajoRepository.findById(idTrabajo).orElse(null);
+        Usuario emisor  = usuarioRepository.findById(idEmisor).orElse(null);
 
-            if (trabajo == null) return ResponseEntity.badRequest().body("Trabajo no encontrado: " + idTrabajo);
-            if (emisor  == null) return ResponseEntity.badRequest().body("Emisor no encontrado: " + idEmisor);
+        if (trabajo == null) return ResponseEntity.badRequest().body("Trabajo no encontrado.");
+        if (emisor  == null) return ResponseEntity.badRequest().body("Emisor no encontrado.");
 
-            Usuario receptor = null;
-            if (body.containsKey("id_receptor")) {
-                try {
-                    Long idReceptor = Long.valueOf(body.get("id_receptor").toString());
-                    if (idReceptor > 0) receptor = usuarioRepository.findById(idReceptor).orElse(null);
-                } catch (Exception ignored) {}
-            }
-
-            Mensaje m = new Mensaje();
-            m.setTrabajo(trabajo);
-            m.setEmisor(emisor);
-            m.setReceptor(receptor);
-            m.setContenido(contenido);
-
-            Mensaje guardado = mensajeRepository.save(m);
-            return ResponseEntity.ok(guardado);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        Usuario receptor = null;
+        if (body.containsKey("id_receptor")) {
+            try {
+                Long idReceptor = Long.valueOf(body.get("id_receptor").toString());
+                if (idReceptor > 0) receptor = usuarioRepository.findById(idReceptor).orElse(null);
+            } catch (Exception ignored) {}
         }
+
+        Mensaje m = new Mensaje();
+        m.setTrabajo(trabajo);
+        m.setEmisor(emisor);
+        m.setReceptor(receptor);
+        m.setContenido(contenido);
+
+        return ResponseEntity.ok(mensajeRepository.save(m));
     }
 }

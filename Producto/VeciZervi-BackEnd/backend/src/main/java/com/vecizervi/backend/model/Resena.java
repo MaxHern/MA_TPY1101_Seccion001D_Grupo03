@@ -1,5 +1,6 @@
 package com.vecizervi.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 
 @Entity
@@ -13,14 +14,17 @@ public class Resena {
 
     @ManyToOne
     @JoinColumn(name = "id_trabajo", nullable = false)
+    @JsonIgnoreProperties({"cliente","categoria","descripcion","postulaciones","mensajes"})
     private Trabajo trabajo;
 
     @ManyToOne
     @JoinColumn(name = "id_emisor", nullable = false)
+    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
     private Usuario emisor;
 
     @ManyToOne
     @JoinColumn(name = "id_receptor", nullable = false)
+    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
     private Usuario receptor;
 
     @Column(nullable = false)
@@ -46,4 +50,6 @@ public class Resena {
     public void setEstrellas(Integer estrellas) { this.estrellas = estrellas; }
     public String getComentario() { return comentario; }
     public void setComentario(String comentario) { this.comentario = comentario; }
+    public String getUrlFotoEvidencia() { return urlFotoEvidencia; }
+    public void setUrlFotoEvidencia(String url) { this.urlFotoEvidencia = url; }
 }

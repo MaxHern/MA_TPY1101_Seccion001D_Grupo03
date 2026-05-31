@@ -1,5 +1,6 @@
 package com.vecizervi.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
@@ -15,10 +16,12 @@ public class Postulacion {
 
     @ManyToOne
     @JoinColumn(name = "id_trabajo", nullable = false)
+    @JsonIgnoreProperties({"cliente","categoria","descripcion","postulaciones","mensajes"})
     private Trabajo trabajo;
 
     @ManyToOne
     @JoinColumn(name = "id_trabajador", nullable = false)
+    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
     private Usuario trabajador;
 
     @Column(name = "mensaje_presentacion", columnDefinition = "TEXT")
@@ -37,6 +40,6 @@ public class Postulacion {
     public Usuario getTrabajador() { return trabajador; }
     public void setTrabajador(Usuario trabajador) { this.trabajador = trabajador; }
     public String getMensajePresentacion() { return mensajePresentacion; }
-    public void setMensajePresentacion(String mensajePresentacion) { this.mensajePresentacion = mensajePresentacion; }
+    public void setMensajePresentacion(String m) { this.mensajePresentacion = m; }
     public LocalDateTime getFechaPostulacion() { return fechaPostulacion; }
 }
