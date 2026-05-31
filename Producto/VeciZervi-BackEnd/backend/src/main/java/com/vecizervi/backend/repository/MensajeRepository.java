@@ -10,13 +10,11 @@ import java.util.List;
 
 public interface MensajeRepository extends JpaRepository<Mensaje, Long> {
 
-    List<Mensaje> findByTrabajoOrderByFechaEnvioAsc(Trabajo trabajo);
+    // Query directa por id — evita el bug de findByTrabajo con objeto
+    @Query("SELECT m FROM Mensaje m WHERE m.trabajo.id = :idTrabajo ORDER BY m.fechaEnvio ASC")
+    List<Mensaje> findByIdTrabajo(@Param("idTrabajo") Long idTrabajo);
 
-    // Trae todos los trabajos donde el usuario participó como emisor o receptor
+    // Para el inbox — trabajos donde el usuario participó
     @Query("SELECT DISTINCT m.trabajo FROM Mensaje m WHERE m.emisor = :usuario OR m.receptor = :usuario")
     List<Trabajo> findTrabajosConMensajesByUsuario(@Param("usuario") Usuario usuario);
-
-    // Último mensaje de un trabajo (para mostrar preview en el inbox)
-    @Query("SELECT m FROM Mensaje m WHERE m.trabajo = :trabajo ORDER BY m.fechaEnvio DESC LIMIT 1")
-    Mensaje findUltimoMensajeByTrabajo(@Param("trabajo") Trabajo trabajo);
 }
