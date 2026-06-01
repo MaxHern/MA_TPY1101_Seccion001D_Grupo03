@@ -22,27 +22,30 @@ public class MensajeController {
     @Autowired private TrabajoRepository trabajoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
 
-    // GET conversación privada entre dos usuarios en un trabajo
-    // Ejemplo: GET /api/mensajes/2?idUsuario1=9&idUsuario2=7
     @GetMapping("/{idTrabajo}")
     public ResponseEntity<?> getMensajes(
             @PathVariable Long idTrabajo,
             @RequestParam(required = false) Long idUsuario1,
             @RequestParam(required = false) Long idUsuario2) {
 
-        // Si vienen los dos usuarios, filtrar por conversación privada
         if (idUsuario1 != null && idUsuario2 != null) {
             List<Mensaje> mensajes = mensajeRepository.findConversacionPrivada(
                 idTrabajo, idUsuario1, idUsuario2
             );
             return ResponseEntity.ok(mensajes);
         }
-
-        // Sin parámetros — devolver vacío (no exponer todos los mensajes)
         return ResponseEntity.ok(List.of());
     }
 
-    // GET inbox — trabajos donde el usuario participó o publicó
+    // ← NUEVO: participantes de un trabajo
+    @GetMapping("/participantes/{idTrabajo}")
+    public ResponseEntity<?> getParticipantes(
+            @PathVariable Long idTrabajo,
+            @RequestParam Long idDueno) {
+        List<Usuario> participantes = mensajeRepository.findParticipantesByTrabajo(idTrabajo, idDueno);
+        return ResponseEntity.ok(participantes);
+    }
+
     @GetMapping("/inbox/{idUsuario}")
     public ResponseEntity<?> getInbox(@PathVariable Long idUsuario) {
         Usuario usuario = usuarioRepository.findById(idUsuario).orElse(null);
@@ -60,7 +63,6 @@ public class MensajeController {
         return ResponseEntity.ok(resultado);
     }
 
-    // POST enviar mensaje — guarda id_receptor para chat privado
     @PostMapping
     public ResponseEntity<?> postMensaje(@RequestBody Map<String, Object> body) {
         try {
@@ -80,7 +82,6 @@ public class MensajeController {
             if (trabajo == null) return ResponseEntity.badRequest().body("Trabajo no encontrado.");
             if (emisor  == null) return ResponseEntity.badRequest().body("Emisor no encontrado.");
 
-            // Receptor obligatorio para chat privado
             Usuario receptor = null;
             if (body.containsKey("id_receptor")) {
                 try {
