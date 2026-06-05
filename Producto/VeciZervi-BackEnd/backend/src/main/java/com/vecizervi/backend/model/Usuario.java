@@ -35,7 +35,10 @@ public class Usuario {
     private LocalDateTime cuentaBloqueadaHasta;
     private String tokenRecuperacion;
 
-    // ← CAMPO NUEVO
     @Column(name = "rol")
     private String rol = "USER";
+
+    // NUEVO: calificación promedio actualizada automáticamente al recibir reseñas
+    @Column(name = "calificacion_promedio")
+    private Double calificacionPromedio = 0.0;
 }

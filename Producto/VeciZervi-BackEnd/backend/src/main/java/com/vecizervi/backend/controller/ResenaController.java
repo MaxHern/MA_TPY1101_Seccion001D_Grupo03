@@ -3,6 +3,7 @@ package com.vecizervi.backend.controller;
 import com.vecizervi.backend.model.Resena;
 import com.vecizervi.backend.model.Trabajo;
 import com.vecizervi.backend.model.Usuario;
+import com.vecizervi.backend.repository.ResenaRepository;
 import com.vecizervi.backend.repository.TrabajoRepository;
 import com.vecizervi.backend.repository.UsuarioRepository;
 import com.vecizervi.backend.service.ResenaService;
@@ -20,14 +21,13 @@ public class ResenaController {
     @Autowired private ResenaService resenaService;
     @Autowired private TrabajoRepository trabajoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private ResenaRepository resenaRepository;
 
-    // GET todas las reseñas (admin)
     @GetMapping
     public List<Resena> listarResenas() {
         return resenaService.findAll();
     }
 
-    // FIX: GET reseñas por trabajo — el Android lo pide con 404 antes
     @GetMapping("/trabajo/{idTrabajo}")
     public ResponseEntity<?> getResenasPorTrabajo(@PathVariable Long idTrabajo) {
         Trabajo trabajo = trabajoRepository.findById(idTrabajo).orElse(null);
@@ -35,8 +35,14 @@ public class ResenaController {
         return ResponseEntity.ok(resenaService.findByTrabajo(trabajo));
     }
 
-    // FIX: POST recibe campos planos (id_trabajo, id_emisor, id_receptor)
-    // en vez de objetos anidados que causaban error 500
+    // GET reseñas recibidas por un usuario (para su perfil público)
+    @GetMapping("/usuario/{idUsuario}")
+    public ResponseEntity<?> getResenasPorReceptor(@PathVariable Long idUsuario) {
+        Usuario receptor = usuarioRepository.findById(idUsuario).orElse(null);
+        if (receptor == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(resenaRepository.findByReceptor(receptor));
+    }
+
     @PostMapping
     public ResponseEntity<?> crearResena(@RequestBody Map<String, Object> body) {
         if (!body.containsKey("id_trabajo") || !body.containsKey("id_emisor") ||
@@ -60,13 +66,28 @@ public class ResenaController {
         if (emisor   == null) return ResponseEntity.badRequest().body("Emisor no encontrado.");
         if (receptor == null) return ResponseEntity.badRequest().body("Receptor no encontrado.");
 
+        // PREVENIR DUPLICADOS: un emisor solo puede reseñar un trabajo una vez
+        boolean yaReseno = resenaRepository.existsByTrabajoAndEmisor(trabajo, emisor);
+        if (yaReseno)
+            return ResponseEntity.badRequest().body("Ya has calificado este trabajo. Puedes ver tu reseña en el perfil del usuario.");
+
         Resena r = new Resena();
         r.setTrabajo(trabajo);
         r.setEmisor(emisor);
         r.setReceptor(receptor);
         r.setEstrellas(estrellas);
         r.setComentario(comentario);
+        Resena guardada = resenaService.save(r);
 
-        return ResponseEntity.ok(resenaService.save(r));
+        // ACTUALIZAR CALIFICACIÓN PROMEDIO del receptor
+        List<Resena> todasResenas = resenaRepository.findByReceptor(receptor);
+        double promedio = todasResenas.stream()
+            .mapToInt(Resena::getEstrellas)
+            .average()
+            .orElse(0.0);
+        receptor.setCalificacionPromedio(Math.round(promedio * 100.0) / 100.0);
+        usuarioRepository.save(receptor);
+
+        return ResponseEntity.ok(guardada);
     }
 }
