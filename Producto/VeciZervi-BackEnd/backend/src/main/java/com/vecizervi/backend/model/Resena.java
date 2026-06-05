@@ -14,17 +14,30 @@ public class Resena {
 
     @ManyToOne
     @JoinColumn(name = "id_trabajo", nullable = false)
-    @JsonIgnoreProperties({"cliente","categoria","descripcion","postulaciones","mensajes"})
+    // Solo devolver id y titulo del trabajo para evitar ciclos
+    @JsonIgnoreProperties({
+        "cliente","categoria","descripcion","postulaciones",
+        "mensajes","estado","precio","comuna","fechaPublicacion",
+        "fechaFinalizacion","latitud","longitud"
+    })
     private Trabajo trabajo;
 
     @ManyToOne
     @JoinColumn(name = "id_emisor", nullable = false)
-    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
+    @JsonIgnoreProperties({
+        "password","tokenRecuperacion","cuentaBloqueadaHasta",
+        "intentosFallidos","herramientasPropias","calificacionPromedio",
+        "rut","fechaNacimiento","correo","rol"
+    })
     private Usuario emisor;
 
     @ManyToOne
     @JoinColumn(name = "id_receptor", nullable = false)
-    @JsonIgnoreProperties({"password","tokenRecuperacion","cuentaBloqueadaHasta","intentosFallidos","herramientasPropias"})
+    @JsonIgnoreProperties({
+        "password","tokenRecuperacion","cuentaBloqueadaHasta",
+        "intentosFallidos","herramientasPropias","calificacionPromedio",
+        "rut","fechaNacimiento","correo","rol"
+    })
     private Usuario receptor;
 
     @Column(nullable = false)
