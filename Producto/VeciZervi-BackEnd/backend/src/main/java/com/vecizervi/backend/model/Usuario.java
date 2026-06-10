@@ -7,15 +7,19 @@ import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-// FIX-22/S03: ocultar RUT, correo y campos internos en todas las respuestas JSON públicas
-@JsonIgnoreProperties({
-    "rut",
-    "correo",
-    "contrasenaEnCriptada",
-    "tokenRecuperacion",
-    "cuentaBloqueadaHasta",
-    "intentosFallidos"
-})
+// FIX-22/S03: ocultar campos sensibles en respuestas JSON, pero permitir recibirlos en peticiones
+@JsonIgnoreProperties(
+    value = {
+        "rut",
+        "correo",
+        "contrasenaEnCriptada",
+        "tokenRecuperacion",
+        "cuentaBloqueadaHasta",
+        "intentosFallidos"
+    },
+    allowSetters = true   // permite que el backend RECIBA estos campos (login, registro, etc.)
+                          // pero NO los envía en respuestas (protección S03)
+)
 @Data
 @Entity
 @Table(name = "usuarios")
