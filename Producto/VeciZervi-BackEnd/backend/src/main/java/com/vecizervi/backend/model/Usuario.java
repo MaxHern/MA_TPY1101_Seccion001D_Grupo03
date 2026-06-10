@@ -4,8 +4,18 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+// FIX-22/S03: ocultar RUT, correo y campos internos en todas las respuestas JSON públicas
+@JsonIgnoreProperties({
+    "rut",
+    "correo",
+    "contrasenaEnCriptada",
+    "tokenRecuperacion",
+    "cuentaBloqueadaHasta",
+    "intentosFallidos"
+})
 @Data
 @Entity
 @Table(name = "usuarios")
@@ -38,7 +48,6 @@ public class Usuario {
     @Column(name = "rol")
     private String rol = "USER";
 
-    // NUEVO: calificación promedio actualizada automáticamente al recibir reseñas
     @Column(name = "calificacion_promedio")
     private Double calificacionPromedio = 0.0;
 }

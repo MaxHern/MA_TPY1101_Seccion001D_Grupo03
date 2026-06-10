@@ -2,6 +2,7 @@ package com.vecizervi.backend.controller;
 
 import com.vecizervi.backend.model.Usuario;
 import com.vecizervi.backend.repository.UsuarioRepository;
+import com.vecizervi.backend.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -17,11 +18,10 @@ import java.util.Map;
 public class UsuarioController {
 
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private JwtUtil jwtUtil;
 
-    // BCrypt: se crea una sola vez y se reutiliza
     private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
 
-    // ── Registro: hashea la contraseña con BCrypt antes de guardar ────────
     @PostMapping("/registro")
     public ResponseEntity<?> registrarUsuario(@RequestBody Usuario nuevoUsuario) {
         if (nuevoUsuario.getRut() == null || nuevoUsuario.getCorreo() == null)
@@ -30,7 +30,6 @@ public class UsuarioController {
             nuevoUsuario.getContrasenaEnCriptada().length() < 8)
             return ResponseEntity.badRequest().body("La contraseña debe tener al menos 8 caracteres.");
 
-        // BCRYPT: hashear la contraseña antes de guardarla
         String hash = bcrypt.encode(nuevoUsuario.getContrasenaEnCriptada());
         nuevoUsuario.setContrasenaEnCriptada(hash);
 
@@ -38,14 +37,14 @@ public class UsuarioController {
         return ResponseEntity.ok(nuevoUsuario);
     }
 
-    // ── Login: bloqueo a los 3 intentos + verificación BCrypt ─────────────
+    // ── Login: devuelve mensaje ambiguo cuando el correo no existe (FIX-08) ──
     @PostMapping("/login")
     public ResponseEntity<?> iniciarSesion(@RequestBody Usuario loginRequest) {
         Usuario usuarioDB = usuarioRepository.findByCorreo(loginRequest.getCorreo());
         if (usuarioDB == null)
-            return ResponseEntity.status(401).body("Correo incorrecto.");
+            // ANTES: "Correo incorrecto." revelaba si el correo existe o no
+            return ResponseEntity.status(401).body("Correo o contraseña incorrectos.");
 
-        // Verificar bloqueo
         if (usuarioDB.getCuentaBloqueadaHasta() != null) {
             if (LocalDateTime.now().isBefore(usuarioDB.getCuentaBloqueadaHasta())) {
                 long minutosRestantes = java.time.Duration.between(
@@ -56,14 +55,12 @@ public class UsuarioController {
                     "Puedes recuperar tu contraseña usando '¿Olvidaste tu contraseña?'"
                 );
             } else {
-                // Desbloquear automáticamente si ya pasó el tiempo
                 usuarioDB.setIntentosFallidos(0);
                 usuarioDB.setCuentaBloqueadaHasta(null);
                 usuarioRepository.save(usuarioDB);
             }
         }
 
-        // Verificar contraseña con BCrypt
         boolean claveCorrecta = bcrypt.matches(
             loginRequest.getContrasenaEnCriptada(),
             usuarioDB.getContrasenaEnCriptada()
@@ -73,7 +70,6 @@ public class UsuarioController {
             usuarioDB.setIntentosFallidos(usuarioDB.getIntentosFallidos() + 1);
             int intentos = usuarioDB.getIntentosFallidos();
 
-            // BLOQUEO A LOS 3 INTENTOS
             if (intentos >= 3) {
                 usuarioDB.setCuentaBloqueadaHasta(LocalDateTime.now().plusMinutes(15));
                 usuarioRepository.save(usuarioDB);
@@ -85,16 +81,22 @@ public class UsuarioController {
 
             usuarioRepository.save(usuarioDB);
             int restantes = 3 - intentos;
+            // Mensaje genérico también en contraseña incorrecta
             return ResponseEntity.status(401).body(
-                "Contraseña incorrecta. Te quedan " + restantes + " intento(s)."
+                "Correo o contraseña incorrectos. Te quedan " + restantes + " intento(s)."
             );
         }
 
-        // Login exitoso
         usuarioDB.setIntentosFallidos(0);
         usuarioDB.setCuentaBloqueadaHasta(null);
         usuarioRepository.save(usuarioDB);
-        return ResponseEntity.ok(usuarioDB);
+
+        // S04: devolver token JWT junto al usuario
+        String token = jwtUtil.generarToken(usuarioDB.getId(), usuarioDB.getRol());
+        Map<String, Object> respuesta = new HashMap<>();
+        respuesta.put("usuario", usuarioDB);
+        respuesta.put("token", token);
+        return ResponseEntity.ok(respuesta);
     }
 
     @GetMapping
@@ -142,16 +144,19 @@ public class UsuarioController {
         return ResponseEntity.ok("Usuario eliminado.");
     }
 
-    // ── Recuperar contraseña: PASO 1 ──────────────────────────────────────
+    // ── Recuperar contraseña: mensaje ambiguo cuando correo no existe (FIX-08) ──
     @PostMapping("/recuperar-clave")
     public ResponseEntity<?> recuperarClave(@RequestParam String correo) {
         Usuario usuario = usuarioRepository.findByCorreo(correo);
-        if (usuario == null)
-            return ResponseEntity.status(404).body("No existe una cuenta con ese correo.");
+        if (usuario == null) {
+            // ANTES: "No existe una cuenta con ese correo." revelaba el dato
+            Map<String, String> respuesta = new HashMap<>();
+            respuesta.put("mensaje", "Si el correo existe en nuestro sistema, recibirás el código");
+            return ResponseEntity.ok(respuesta);
+        }
 
         String codigo = String.valueOf((int)(Math.random() * 900000) + 100000);
         usuario.setTokenRecuperacion(codigo);
-        // Al recuperar contraseña, desbloquear la cuenta también
         usuario.setIntentosFallidos(0);
         usuario.setCuentaBloqueadaHasta(null);
         usuarioRepository.save(usuario);
@@ -162,7 +167,6 @@ public class UsuarioController {
         return ResponseEntity.ok(respuesta);
     }
 
-    // ── PASO 2: verificar token ───────────────────────────────────────────
     @PostMapping("/verificar-token")
     public ResponseEntity<?> verificarToken(@RequestParam String correo,
                                             @RequestParam String token) {
@@ -174,7 +178,6 @@ public class UsuarioController {
         return ResponseEntity.ok("Token válido.");
     }
 
-    // ── PASO 3: nueva contraseña (también hasheada con BCrypt) ────────────
     @PostMapping("/nueva-clave")
     public ResponseEntity<?> nuevaClave(@RequestParam String correo,
                                         @RequestParam String token,
@@ -187,7 +190,6 @@ public class UsuarioController {
         if (nuevaClave.length() < 8)
             return ResponseEntity.badRequest().body("Mínimo 8 caracteres.");
 
-        // BCRYPT: hashear la nueva contraseña
         usuario.setContrasenaEnCriptada(bcrypt.encode(nuevaClave));
         usuario.setTokenRecuperacion(null);
         usuarioRepository.save(usuario);

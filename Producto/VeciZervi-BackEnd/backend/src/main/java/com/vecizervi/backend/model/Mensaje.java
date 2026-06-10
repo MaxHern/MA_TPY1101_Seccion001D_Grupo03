@@ -48,6 +48,10 @@ public class Mensaje {
     @Column(name = "fecha_envio", updatable = false)
     private LocalDateTime fechaEnvio;
 
+    // FIX-29/30: campo para saber si el receptor ya leyÃ³ el mensaje
+    @Column(name = "leido", nullable = false)
+    private boolean leido = false;
+
     public Mensaje() {}
 
     public Long getId() { return id; }
@@ -62,4 +66,6 @@ public class Mensaje {
     public void setContenido(String contenido) { this.contenido = contenido; }
     public LocalDateTime getFechaEnvio() { return fechaEnvio; }
     public void setFechaEnvio(LocalDateTime f) { this.fechaEnvio = f; }
+    public boolean isLeido() { return leido; }
+    public void setLeido(boolean leido) { this.leido = leido; }
 }

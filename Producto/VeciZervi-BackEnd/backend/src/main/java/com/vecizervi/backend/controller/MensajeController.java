@@ -22,6 +22,7 @@ public class MensajeController {
     @Autowired private TrabajoRepository trabajoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
 
+    // FIX-29/30: al cargar la conversación, marcar como leídos los mensajes del receptor
     @GetMapping("/{idTrabajo}")
     public ResponseEntity<?> getMensajes(
             @PathVariable Long idTrabajo,
@@ -32,12 +33,33 @@ public class MensajeController {
             List<Mensaje> mensajes = mensajeRepository.findConversacionPrivada(
                 idTrabajo, idUsuario1, idUsuario2
             );
+
+            // Marcar como leídos los mensajes que recibió idUsuario1
+            // (idUsuario1 es quien está abriendo el chat, es decir el receptor actual)
+            mensajes.stream()
+                .filter(m -> m.getReceptor() != null
+                          && m.getReceptor().getId().equals(idUsuario1)
+                          && !m.isLeido())
+                .forEach(m -> {
+                    m.setLeido(true);
+                    mensajeRepository.save(m);
+                });
+
             return ResponseEntity.ok(mensajes);
         }
         return ResponseEntity.ok(List.of());
     }
 
-    // ← NUEVO: participantes de un trabajo
+    // FIX-29/30: endpoint para contar no leídos de UNA conversación específica
+    @GetMapping("/no-leidos/{idTrabajo}")
+    public ResponseEntity<?> contarNoLeidosPorConversacion(
+            @PathVariable Long idTrabajo,
+            @RequestParam Long idReceptor) {
+        long count = mensajeRepository
+            .countByTrabajo_IdAndReceptor_IdAndLeidoFalse(idTrabajo, idReceptor);
+        return ResponseEntity.ok(Map.of("noLeidos", count));
+    }
+
     @GetMapping("/participantes/{idTrabajo}")
     public ResponseEntity<?> getParticipantes(
             @PathVariable Long idTrabajo,
@@ -95,6 +117,7 @@ public class MensajeController {
             m.setEmisor(emisor);
             m.setReceptor(receptor);
             m.setContenido(contenido);
+            // leido = false por defecto (el receptor aún no lo ha visto)
 
             return ResponseEntity.ok(mensajeRepository.save(m));
         } catch (Exception e) {
