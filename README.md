@@ -6,7 +6,7 @@ Conectando comunidades a través de soluciones simples.
 
 [![Descargar APK](https://img.shields.io/badge/Descargar-APK-green?style=for-the-badge&logo=android)](https://github.com/MaxHern/MA_TPY1101_Seccion001D_Grupo03/releases/download/v1.0.0/app-debug.1.apk)
 
-> **Nota para la instalación:** Como es una aplicación en fase de pruebas (Sprint 1), es posible que tu teléfono solicite permisos para "Instalar aplicaciones de orígenes desconocidos". Debes permitirlo para continuar con la instalación.
+> **Nota para la instalación:** Como es una aplicación en fase de pruebas, es posible que tu teléfono solicite permisos para "Instalar aplicaciones de orígenes desconocidos". Debes permitirlo para continuar con la instalación.
 
 VeciZervi es una aplicación móvil tipo marketplace vecinal que conecta a personas que necesitan ayuda con tareas cotidianas ("pololos") con vecinos dispuestos a ofrecer sus servicios de forma rápida, cercana y confiable.
 
