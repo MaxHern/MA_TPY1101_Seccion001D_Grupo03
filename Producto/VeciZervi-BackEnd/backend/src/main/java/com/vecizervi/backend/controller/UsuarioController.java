@@ -3,6 +3,8 @@ package com.vecizervi.backend.controller;
 import com.vecizervi.backend.model.Usuario;
 import com.vecizervi.backend.repository.UsuarioRepository;
 import com.vecizervi.backend.security.JwtUtil;
+import com.vecizervi.util.SanitizadorXSS;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -30,6 +32,10 @@ public class UsuarioController {
             nuevoUsuario.getContrasenaEnCriptada().length() < 8)
             return ResponseEntity.badRequest().body("La contraseña debe tener al menos 8 caracteres.");
 
+        // S05 XSS: sanitizar nombres antes de guardar
+        nuevoUsuario.setNombres(SanitizadorXSS.limpiar(nuevoUsuario.getNombres()));
+        nuevoUsuario.setApellidos(SanitizadorXSS.limpiar(nuevoUsuario.getApellidos()));
+
         String hash = bcrypt.encode(nuevoUsuario.getContrasenaEnCriptada());
         nuevoUsuario.setContrasenaEnCriptada(hash);
 
@@ -37,12 +43,10 @@ public class UsuarioController {
         return ResponseEntity.ok(nuevoUsuario);
     }
 
-    // ── Login: devuelve mensaje ambiguo cuando el correo no existe (FIX-08) ──
     @PostMapping("/login")
     public ResponseEntity<?> iniciarSesion(@RequestBody Usuario loginRequest) {
         Usuario usuarioDB = usuarioRepository.findByCorreo(loginRequest.getCorreo());
         if (usuarioDB == null)
-            // ANTES: "Correo incorrecto." revelaba si el correo existe o no
             return ResponseEntity.status(401).body("Correo o contraseña incorrectos.");
 
         if (usuarioDB.getCuentaBloqueadaHasta() != null) {
@@ -69,7 +73,6 @@ public class UsuarioController {
         if (!claveCorrecta) {
             usuarioDB.setIntentosFallidos(usuarioDB.getIntentosFallidos() + 1);
             int intentos = usuarioDB.getIntentosFallidos();
-
             if (intentos >= 3) {
                 usuarioDB.setCuentaBloqueadaHasta(LocalDateTime.now().plusMinutes(15));
                 usuarioRepository.save(usuarioDB);
@@ -78,10 +81,8 @@ public class UsuarioController {
                     "Puedes recuperar tu contraseña usando '¿Olvidaste tu contraseña?'"
                 );
             }
-
             usuarioRepository.save(usuarioDB);
             int restantes = 3 - intentos;
-            // Mensaje genérico también en contraseña incorrecta
             return ResponseEntity.status(401).body(
                 "Correo o contraseña incorrectos. Te quedan " + restantes + " intento(s)."
             );
@@ -91,7 +92,6 @@ public class UsuarioController {
         usuarioDB.setCuentaBloqueadaHasta(null);
         usuarioRepository.save(usuarioDB);
 
-        // S04: devolver token JWT junto al usuario
         String token = jwtUtil.generarToken(usuarioDB.getId(), usuarioDB.getRol());
         Map<String, Object> respuesta = new HashMap<>();
         respuesta.put("usuario", usuarioDB);
@@ -115,8 +115,9 @@ public class UsuarioController {
     public ResponseEntity<?> actualizarPerfil(@PathVariable Long id,
                                                @RequestBody Usuario datosNuevos) {
         return usuarioRepository.findById(id).map(usuario -> {
-            usuario.setNombres(datosNuevos.getNombres());
-            usuario.setApellidos(datosNuevos.getApellidos());
+            // S05 XSS: sanitizar nombres al actualizar perfil
+            usuario.setNombres(SanitizadorXSS.limpiar(datosNuevos.getNombres()));
+            usuario.setApellidos(SanitizadorXSS.limpiar(datosNuevos.getApellidos()));
             usuarioRepository.save(usuario);
             return ResponseEntity.ok(usuario);
         }).orElse(ResponseEntity.notFound().build());
@@ -144,23 +145,19 @@ public class UsuarioController {
         return ResponseEntity.ok("Usuario eliminado.");
     }
 
-    // ── Recuperar contraseña: mensaje ambiguo cuando correo no existe (FIX-08) ──
     @PostMapping("/recuperar-clave")
     public ResponseEntity<?> recuperarClave(@RequestParam String correo) {
         Usuario usuario = usuarioRepository.findByCorreo(correo);
         if (usuario == null) {
-            // ANTES: "No existe una cuenta con ese correo." revelaba el dato
             Map<String, String> respuesta = new HashMap<>();
             respuesta.put("mensaje", "Si el correo existe en nuestro sistema, recibirás el código");
             return ResponseEntity.ok(respuesta);
         }
-
         String codigo = String.valueOf((int)(Math.random() * 900000) + 100000);
         usuario.setTokenRecuperacion(codigo);
         usuario.setIntentosFallidos(0);
         usuario.setCuentaBloqueadaHasta(null);
         usuarioRepository.save(usuario);
-
         Map<String, String> respuesta = new HashMap<>();
         respuesta.put("mensaje", "Código generado correctamente");
         respuesta.put("codigo", codigo);
@@ -189,7 +186,6 @@ public class UsuarioController {
             return ResponseEntity.status(400).body("Código incorrecto.");
         if (nuevaClave.length() < 8)
             return ResponseEntity.badRequest().body("Mínimo 8 caracteres.");
-
         usuario.setContrasenaEnCriptada(bcrypt.encode(nuevaClave));
         usuario.setTokenRecuperacion(null);
         usuarioRepository.save(usuario);

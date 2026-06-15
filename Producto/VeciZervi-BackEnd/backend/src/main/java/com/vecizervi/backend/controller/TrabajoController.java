@@ -7,6 +7,8 @@ import com.vecizervi.backend.model.Usuario;
 import com.vecizervi.backend.repository.CategoriaRepository;
 import com.vecizervi.backend.repository.TrabajoRepository;
 import com.vecizervi.backend.repository.UsuarioRepository;
+import com.vecizervi.util.SanitizadorXSS;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,11 @@ public class TrabajoController {
     public ResponseEntity<?> publicarTrabajo(@RequestBody Trabajo nuevoTrabajo,
                                              @RequestParam Long idCliente,
                                              @RequestParam Long idCategoria) {
+        // S05 XSS: sanitizar campos de texto antes de validar y guardar
+        nuevoTrabajo.setTitulo(SanitizadorXSS.limpiar(nuevoTrabajo.getTitulo()));
+        nuevoTrabajo.setDescripcion(SanitizadorXSS.limpiar(nuevoTrabajo.getDescripcion()));
+        nuevoTrabajo.setComuna(SanitizadorXSS.limpiar(nuevoTrabajo.getComuna()));
+
         if (nuevoTrabajo.getPrecio() == null || nuevoTrabajo.getPrecio() <= 0)
             return ResponseEntity.badRequest().body("El precio debe ser un número mayor a 0.");
         if (nuevoTrabajo.getTitulo() == null || nuevoTrabajo.getTitulo().length() < 5)
@@ -71,10 +78,12 @@ public class TrabajoController {
     @PutMapping("/{id}/editar")
     public ResponseEntity<?> editarTrabajo(@PathVariable Long id, @RequestBody Trabajo datosNuevos) {
         return trabajoRepository.findById(id).map(t -> {
-            t.setTitulo(datosNuevos.getTitulo());
-            t.setDescripcion(datosNuevos.getDescripcion());
+            // S05 XSS: sanitizar antes de actualizar
+            t.setTitulo(SanitizadorXSS.limpiar(datosNuevos.getTitulo()));
+            t.setDescripcion(SanitizadorXSS.limpiar(datosNuevos.getDescripcion()));
             t.setPrecio(datosNuevos.getPrecio());
-            t.setComuna(datosNuevos.getComuna());
+            t.setComuna(SanitizadorXSS.limpiar(datosNuevos.getComuna()));
+            if (datosNuevos.getEstado() != null) t.setEstado(datosNuevos.getEstado());
             return ResponseEntity.ok(trabajoRepository.save(t));
         }).orElse(ResponseEntity.notFound().build());
     }

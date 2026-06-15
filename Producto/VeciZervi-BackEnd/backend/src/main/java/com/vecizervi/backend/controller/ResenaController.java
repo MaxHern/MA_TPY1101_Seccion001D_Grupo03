@@ -7,6 +7,8 @@ import com.vecizervi.backend.repository.ResenaRepository;
 import com.vecizervi.backend.repository.TrabajoRepository;
 import com.vecizervi.backend.repository.UsuarioRepository;
 import com.vecizervi.backend.service.ResenaService;
+import com.vecizervi.util.SanitizadorXSS;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +37,6 @@ public class ResenaController {
         return ResponseEntity.ok(resenaService.findByTrabajo(trabajo));
     }
 
-    // GET reseñas recibidas por un usuario (para su perfil público)
     @GetMapping("/usuario/{idUsuario}")
     public ResponseEntity<?> getResenasPorReceptor(@PathVariable Long idUsuario) {
         Usuario receptor = usuarioRepository.findById(idUsuario).orElse(null);
@@ -53,7 +54,11 @@ public class ResenaController {
         Long idEmisor   = Long.valueOf(body.get("id_emisor").toString());
         Long idReceptor = Long.valueOf(body.get("id_receptor").toString());
         Integer estrellas = Integer.valueOf(body.get("estrellas").toString());
-        String comentario = body.getOrDefault("comentario", "").toString();
+
+        // S05 XSS: sanitizar comentario
+        String comentario = SanitizadorXSS.limpiarPermitirVacio(
+            body.getOrDefault("comentario", "").toString()
+        );
 
         if (estrellas < 1 || estrellas > 5)
             return ResponseEntity.badRequest().body("Las estrellas deben ser entre 1 y 5.");
@@ -66,7 +71,6 @@ public class ResenaController {
         if (emisor   == null) return ResponseEntity.badRequest().body("Emisor no encontrado.");
         if (receptor == null) return ResponseEntity.badRequest().body("Receptor no encontrado.");
 
-        // PREVENIR DUPLICADOS: un emisor solo puede reseñar un trabajo una vez
         boolean yaReseno = resenaRepository.existsByTrabajoAndEmisor(trabajo, emisor);
         if (yaReseno)
             return ResponseEntity.badRequest().body("Ya has calificado este trabajo. Puedes ver tu reseña en el perfil del usuario.");
@@ -79,12 +83,9 @@ public class ResenaController {
         r.setComentario(comentario);
         Resena guardada = resenaService.save(r);
 
-        // ACTUALIZAR CALIFICACIÓN PROMEDIO del receptor
         List<Resena> todasResenas = resenaRepository.findByReceptor(receptor);
         double promedio = todasResenas.stream()
-            .mapToInt(Resena::getEstrellas)
-            .average()
-            .orElse(0.0);
+            .mapToInt(Resena::getEstrellas).average().orElse(0.0);
         receptor.setCalificacionPromedio(Math.round(promedio * 100.0) / 100.0);
         usuarioRepository.save(receptor);
 

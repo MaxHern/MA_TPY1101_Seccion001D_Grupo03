@@ -6,6 +6,8 @@ import com.vecizervi.backend.model.Usuario;
 import com.vecizervi.backend.repository.PostulacionRepository;
 import com.vecizervi.backend.repository.TrabajoRepository;
 import com.vecizervi.backend.repository.UsuarioRepository;
+import com.vecizervi.util.SanitizadorXSS;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,12 +24,19 @@ public class PostulacionController {
     @Autowired private TrabajoRepository trabajoRepository;
     @Autowired private UsuarioRepository usuarioRepository;
 
-    // POST postular a un trabajo
     @PostMapping
     public ResponseEntity<?> postular(@RequestBody Map<String, Object> body) {
+        if (!body.containsKey("id_trabajo") || !body.containsKey("id_trabajador")) {
+            return ResponseEntity.badRequest().body("Faltan campos obligatorios: id_trabajo e id_trabajador.");
+        }
+
         Long idTrabajo    = Long.valueOf(body.get("id_trabajo").toString());
         Long idTrabajador = Long.valueOf(body.get("id_trabajador").toString());
-        String mensaje    = body.getOrDefault("mensaje_presentacion", "").toString();
+
+        // S05 XSS: sanitizar mensaje de presentación
+        String mensaje = SanitizadorXSS.limpiarPermitirVacio(
+            body.getOrDefault("mensaje_presentacion", "").toString()
+        );
 
         Trabajo  trabajo    = trabajoRepository.findById(idTrabajo).orElse(null);
         Usuario  trabajador = usuarioRepository.findById(idTrabajador).orElse(null);
@@ -43,7 +52,6 @@ public class PostulacionController {
         return ResponseEntity.ok(postulacionRepository.save(p));
     }
 
-    // GET postulaciones de un trabajo
     @GetMapping("/trabajo/{idTrabajo}")
     public ResponseEntity<?> getPostulaciones(@PathVariable Long idTrabajo) {
         Trabajo trabajo = trabajoRepository.findById(idTrabajo).orElse(null);
@@ -51,22 +59,15 @@ public class PostulacionController {
         return ResponseEntity.ok(postulacionRepository.findByTrabajo(trabajo));
     }
 
-    // GET trabajos donde el usuario postulo (para el inbox)
     @GetMapping("/trabajador/{idTrabajador}")
     public ResponseEntity<?> getTrabajosPorTrabajador(@PathVariable Long idTrabajador) {
         Usuario trabajador = usuarioRepository.findById(idTrabajador).orElse(null);
         if (trabajador == null) return ResponseEntity.notFound().build();
-
         List<Trabajo> trabajos = postulacionRepository.findByTrabajador(trabajador)
-                .stream()
-                .map(Postulacion::getTrabajo)
-                .distinct()
-                .collect(Collectors.toList());
-
+                .stream().map(Postulacion::getTrabajo).distinct().collect(Collectors.toList());
         return ResponseEntity.ok(trabajos);
     }
 
-    // GET todas (admin)
     @GetMapping
     public List<Postulacion> getAll() {
         return postulacionRepository.findAll();
