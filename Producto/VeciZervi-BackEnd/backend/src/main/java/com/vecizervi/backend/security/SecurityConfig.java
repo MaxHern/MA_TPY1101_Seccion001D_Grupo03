@@ -24,18 +24,20 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // ── Rutas públicas (sin token) ───────────────────────────────────
+                // ── Rutas públicas (sin token) — SOLO lo estrictamente necesario
+                // antes de que el usuario tenga sesión iniciada ──────────────────
                 .requestMatchers(
                     "/api/usuarios/login",
                     "/api/usuarios/registro",
                     "/api/usuarios/recuperar-clave",
                     "/api/usuarios/verificar-token",
                     "/api/usuarios/nueva-clave",
-                    "/api/trabajos",
-                    "/api/trabajos/",
-                    "/ws/"
+                    "/ws/**"
                 ).permitAll()
-                // ── Todo lo demás requiere token JWT ────────────────────────────
+                // Todo lo demás (trabajos, mensajes, reseñas, postulaciones,
+                // perfil de usuario) requiere estar logueado con JWT válido,
+                // ya que el flujo de la app siempre pasa por login primero
+                // antes de llegar a la pantalla de inicio.
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

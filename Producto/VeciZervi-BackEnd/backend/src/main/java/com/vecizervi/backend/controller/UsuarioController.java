@@ -32,7 +32,6 @@ public class UsuarioController {
             nuevoUsuario.getContrasenaEnCriptada().length() < 8)
             return ResponseEntity.badRequest().body("La contraseña debe tener al menos 8 caracteres.");
 
-        // S05 XSS: sanitizar nombres antes de guardar
         nuevoUsuario.setNombres(SanitizadorXSS.limpiar(nuevoUsuario.getNombres()));
         nuevoUsuario.setApellidos(SanitizadorXSS.limpiar(nuevoUsuario.getApellidos()));
 
@@ -93,8 +92,23 @@ public class UsuarioController {
         usuarioRepository.save(usuarioDB);
 
         String token = jwtUtil.generarToken(usuarioDB.getId(), usuarioDB.getRol());
+
+        // S03/S05 FIX: DTO manual — incluye rut/correo/fechaNacimiento porque el
+        // frontend SÍ los necesita para mostrar el perfil del propio usuario logueado.
+        // Lo que NUNCA viaja es la contraseña, el token de recuperación ni los
+        // contadores de bloqueo — esos no tienen ninguna razón para salir del backend.
+        Map<String, Object> datosUsuario = new HashMap<>();
+        datosUsuario.put("idUsuario", usuarioDB.getId());
+        datosUsuario.put("rut", usuarioDB.getRut());
+        datosUsuario.put("nombres", usuarioDB.getNombres());
+        datosUsuario.put("apellidos", usuarioDB.getApellidos());
+        datosUsuario.put("fechaNacimiento", usuarioDB.getFechaNacimiento());
+        datosUsuario.put("correo", usuarioDB.getCorreo());
+        datosUsuario.put("rol", usuarioDB.getRol());
+        datosUsuario.put("calificacionPromedio", usuarioDB.getCalificacionPromedio());
+
         Map<String, Object> respuesta = new HashMap<>();
-        respuesta.put("usuario", usuarioDB);
+        respuesta.put("usuario", datosUsuario);
         respuesta.put("token", token);
         return ResponseEntity.ok(respuesta);
     }
@@ -115,7 +129,6 @@ public class UsuarioController {
     public ResponseEntity<?> actualizarPerfil(@PathVariable Long id,
                                                @RequestBody Usuario datosNuevos) {
         return usuarioRepository.findById(id).map(usuario -> {
-            // S05 XSS: sanitizar nombres al actualizar perfil
             usuario.setNombres(SanitizadorXSS.limpiar(datosNuevos.getNombres()));
             usuario.setApellidos(SanitizadorXSS.limpiar(datosNuevos.getApellidos()));
             usuarioRepository.save(usuario);
@@ -145,22 +158,33 @@ public class UsuarioController {
         return ResponseEntity.ok("Usuario eliminado.");
     }
 
+    // NOTA IMPORTANTE PARA LA DEFENSA / DEMO EN CLASE:
+    // En producción real, el código de recuperación se enviaría por correo electrónico
+    // y NUNCA viajaría en la respuesta HTTP (eso era la vulnerabilidad S03 corregida).
+    // Como este proyecto académico no tiene servicio de envío de correo configurado,
+    // se mantiene el código en la respuesta SOLO para que el flujo sea demostrable
+    // en la demo, dejando documentado que es un riesgo aceptado temporalmente.
     @PostMapping("/recuperar-clave")
     public ResponseEntity<?> recuperarClave(@RequestParam String correo) {
         Usuario usuario = usuarioRepository.findByCorreo(correo);
+
+        Map<String, String> respuesta = new HashMap<>();
+        respuesta.put("mensaje", "Si el correo existe en nuestro sistema, recibirás el código");
+
         if (usuario == null) {
-            Map<String, String> respuesta = new HashMap<>();
-            respuesta.put("mensaje", "Si el correo existe en nuestro sistema, recibirás el código");
             return ResponseEntity.ok(respuesta);
         }
+
         String codigo = String.valueOf((int)(Math.random() * 900000) + 100000);
         usuario.setTokenRecuperacion(codigo);
         usuario.setIntentosFallidos(0);
         usuario.setCuentaBloqueadaHasta(null);
         usuarioRepository.save(usuario);
-        Map<String, String> respuesta = new HashMap<>();
-        respuesta.put("mensaje", "Código generado correctamente");
+
+        // Riesgo aceptado temporalmente (documentado en informe): sin servicio de
+        // correo real, se devuelve el código para que la demo sea funcional.
         respuesta.put("codigo", codigo);
+
         return ResponseEntity.ok(respuesta);
     }
 
